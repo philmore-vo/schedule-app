@@ -198,16 +198,33 @@ export function sortTasks(tasks, sortBy = 'deadline') {
  */
 export function getTasksForAIContext() {
   const tasks = store.getTasks().filter(t => !t.completed);
-  return tasks.map(t => ({
-    id: t.id,
-    title: t.title,
-    description: t.description || '',
-    deadline: t.deadline || 'No deadline',
-    estimatedMinutes: t.estimatedMinutes,
-    category: t.category,
-    priority: t.priority,
-    subtaskCount: (t.subtasks || []).length,
-    subtasksCompleted: (t.subtasks || []).filter(s => s.completed).length,
-    createdAt: t.createdAt,
-  }));
+  return tasks.map(t => {
+    // Convert UTC ISO to local timezone string so AI reads correct times
+    let deadlineLocal = 'No deadline';
+    if (t.deadline) {
+      const d = new Date(t.deadline);
+      deadlineLocal = d.toLocaleString('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+    }
+
+    const createdLocal = new Date(t.createdAt).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description || '',
+      deadline: deadlineLocal,
+      estimatedMinutes: t.estimatedMinutes,
+      category: t.category,
+      priority: t.priority,
+      subtaskCount: (t.subtasks || []).length,
+      subtasksCompleted: (t.subtasks || []).filter(s => s.completed).length,
+      createdAt: createdLocal,
+    };
+  });
 }
