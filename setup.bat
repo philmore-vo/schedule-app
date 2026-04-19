@@ -15,21 +15,9 @@ where node >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo  Node.js is NOT installed!
-    echo  Downloading Node.js...
-    echo.
-    set "NODE_URL=https://nodejs.org/dist/v22.13.1/node-v22.13.1-x64.msi"
-    set "NODE_INSTALLER=%TEMP%\node-installer.msi"
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!NODE_URL!' -OutFile '!NODE_INSTALLER!' -UseBasicParsing"
-    if not exist "!NODE_INSTALLER!" (
-        echo  FAILED to download Node.js.
-        echo  Please download from: https://nodejs.org
-        goto :end
-    )
-    echo  Installing Node.js...
-    msiexec /i "!NODE_INSTALLER!" /passive /norestart
-    set "PATH=%PATH%;C:\Program Files\nodejs"
-    del "!NODE_INSTALLER!" >nul 2>&1
-    echo  Node.js installed!
+    echo  Please download from: https://nodejs.org
+    echo  Then run this setup again.
+    goto :end
 ) else (
     for /f "tokens=*" %%i in ('node -v') do echo  Node.js found: %%i
 )
@@ -52,13 +40,21 @@ echo [3/4] Create Desktop shortcut? (Y/N)
 set /p SHORTCUT="  > "
 if /i "%SHORTCUT%"=="Y" (
     echo  Creating shortcut...
-    set "APPDIR=%~dp0"
-    set "APPDIR=!APPDIR:~0,-1!"
-    powershell -ExecutionPolicy Bypass -Command " = New-Object -ComObject WScript.Shell;  = .CreateShortcut(\"C:\Users\votro_ndnyus1\Desktop\TaskFlow AI.lnk\"); .TargetPath = \"!APPDIR!\start-app.bat\"; .WorkingDirectory = \"!APPDIR!\"; .WindowStyle = 7; .Save()"
+    set "BATPATH=%~dp0start-app.bat"
+    set "WDIR=%~dp0"
+    set "WDIR=!WDIR:~0,-1!"
+    echo Set ws = CreateObject^("WScript.Shell"^) > "%TEMP%\mksc.vbs"
+    echo Set sc = ws.CreateShortcut^(ws.SpecialFolders^("Desktop"^) ^& "\TaskFlow AI.lnk"^) >> "%TEMP%\mksc.vbs"
+    echo sc.TargetPath = "!BATPATH!" >> "%TEMP%\mksc.vbs"
+    echo sc.WorkingDirectory = "!WDIR!" >> "%TEMP%\mksc.vbs"
+    echo sc.WindowStyle = 7 >> "%TEMP%\mksc.vbs"
+    echo sc.Save >> "%TEMP%\mksc.vbs"
+    cscript //nologo "%TEMP%\mksc.vbs"
+    del "%TEMP%\mksc.vbs" >nul 2>&1
     if exist "%USERPROFILE%\Desktop\TaskFlow AI.lnk" (
         echo  Shortcut created on Desktop!
     ) else (
-        echo  Could not create shortcut automatically.
+        echo  Could not create shortcut.
     )
 )
 
