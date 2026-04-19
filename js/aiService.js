@@ -29,17 +29,20 @@ export async function scheduleTasksWithAI() {
 
 Your job is to analyze the user's task list and create an optimal execution schedule.
 
-RULES:
-1. Consider task urgency (deadline proximity), importance (priority level), and estimated duration.
-2. Use the Eisenhower Matrix: Do urgent+important first, schedule important+not-urgent, delegate/batch urgent+not-important.
+STRICT PRIORITY RULES (follow this order — DO NOT rearrange):
+1. OVERDUE tasks (past deadline) → schedule FIRST, immediately.
+2. Then sort by PRIORITY LEVEL strictly: critical > high > medium > low.
+   - NEVER put a "low" or "medium" task before a "high" or "critical" task.
+   - When two tasks have the SAME priority, the one with the EARLIER deadline goes first.
+   - When two tasks have the SAME priority AND SAME deadline, the one with shorter estimated time goes first.
 3. Working hours: ${settings.workStartHour}:00 to ${settings.workEndHour}:00.
 4. Add ${settings.breakMinutes}-minute breaks between tasks.
-5. For overdue tasks, prioritize them immediately.
-6. Group similar-category tasks to reduce context switching.
-7. Place high-focus tasks earlier in the day when energy is higher.
-8. Current date/time: ${currentDate}, ${currentTime}.
-9. If current time is past working hours, schedule from tomorrow's start.
-10. Give a short, encouraging reason for each task's position (this helps the user feel motivated).
+5. Current date/time: ${currentDate}, ${currentTime}.
+6. If current time is past working hours, schedule from tomorrow's start.
+7. If tasks overflow today's working hours, continue to the next day.
+8. Give a short, encouraging reason for each task's position (this helps the user feel motivated).
+
+IMPORTANT: The priority field is the MOST important factor. A "critical" task must ALWAYS come before "high", "high" before "medium", "medium" before "low". No exceptions.
 
 Return ONLY a valid JSON array (no markdown, no code fences), with objects in this exact format:
 [
