@@ -1,0 +1,244 @@
+/* ============================================
+   TaskFlow AI — Chat Panel Styles
+   ============================================ */
+
+/* ── Chat Messages ── */
+.chat-message {
+  display: flex;
+  gap: var(--space-3);
+  animation: fadeSlideUp 0.3s ease forwards;
+}
+
+.chat-message.user {
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.chat-message.assistant .chat-avatar {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+}
+
+.chat-message.user .chat-avatar {
+  background: var(--bg-glass);
+  color: var(--text-secondary);
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  position: relative;
+}
+
+.chat-message.assistant .chat-bubble {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-top-left-radius: 4px;
+}
+
+.chat-message.user .chat-bubble {
+  background: var(--accent-primary);
+  color: white;
+  border-top-right-radius: 4px;
+}
+
+/* ── Chat bubble markdown rendering ── */
+.chat-bubble p {
+  margin-bottom: var(--space-2);
+}
+.chat-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-bubble strong {
+  font-weight: 600;
+  color: var(--accent-primary-hover);
+}
+
+.chat-message.user .chat-bubble strong {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.chat-bubble code {
+  background: var(--bg-glass);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.chat-bubble pre {
+  background: var(--bg-primary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: var(--space-2) 0;
+}
+
+.chat-bubble pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.chat-bubble ul, .chat-bubble ol {
+  padding-left: var(--space-5);
+  margin: var(--space-2) 0;
+}
+
+.chat-bubble li {
+  margin-bottom: var(--space-1);
+}
+
+/* ── Typing Indicator ── */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  animation: fadeSlideUp 0.3s ease;
+}
+
+.typing-indicator .chat-avatar {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: 4px;
+}
+
+.typing-dots span {
+  width: 7px;
+  height: 7px;
+  background: var(--text-tertiary);
+  border-radius: 50%;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+/* ── Chat Input ── */
+.chat-input-wrapper {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  outline: none;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  line-height: 1.5;
+  transition: border-color var(--transition-fast);
+}
+
+.chat-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.chat-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chat-send-btn:hover {
+  background: var(--accent-primary-hover);
+  transform: scale(1.05);
+}
+
+.chat-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Welcome message ── */
+.chat-welcome {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+}
+
+.chat-welcome-icon {
+  font-size: 40px;
+  margin-bottom: var(--space-4);
+}
+
+.chat-welcome-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.chat-welcome-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  line-height: 1.6;
+  margin-bottom: var(--space-4);
+}
+
+/* ── AI Status Indicator ── */
+.ai-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.ai-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-success);
+}
+
+.ai-status-dot.disconnected {
+  background: var(--accent-danger);
+}
+
+.ai-status-dot.connecting {
+  background: var(--accent-warning);
+  animation: pulse 1.5s ease infinite;
+}

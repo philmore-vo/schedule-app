@@ -1,0 +1,463 @@
+/* ============================================
+   TaskFlow AI — Analytics Dashboard Styles
+   ============================================ */
+
+.analytics-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 0;
+  animation: fadeIn 0.4s ease;
+}
+
+/* ── Hero: Productivity Score Circle ── */
+
+.analytics-hero {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, var(--surface-1), var(--surface-2));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.score-circle {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--score-color) var(--score-pct),
+    var(--surface-3) var(--score-pct)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--score-color) 30%, transparent);
+}
+
+.score-inner {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: var(--surface-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.score-grade {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.score-info h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.score-info p {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Metrics Row ── */
+
+.analytics-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.metric-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 16px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.metric-card.warning {
+  border-color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 5%, var(--surface-1));
+}
+
+.metric-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── Analytics Card ── */
+
+.analytics-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+}
+
+.analytics-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+
+/* ── Time Stats Row ── */
+
+.time-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.time-stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px 16px;
+}
+
+.time-stat-divider {
+  width: 1px;
+  height: 50px;
+  background: var(--border-subtle);
+}
+
+.time-stat-count {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent-primary);
+  line-height: 1;
+}
+
+.time-stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.time-stat-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── Trend Chart (Bar Chart) ── */
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 140px;
+  padding-top: 20px;
+}
+
+.trend-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.trend-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  min-height: 14px;
+}
+
+.trend-bar {
+  width: 100%;
+  min-height: 4px;
+  background: var(--accent-primary);
+  border-radius: 4px 4px 0 0;
+  opacity: 0.7;
+  transition: opacity 0.2s, height 0.5s ease;
+}
+
+.trend-bar:hover {
+  opacity: 1;
+}
+
+.trend-bar.today {
+  opacity: 1;
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.trend-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.trend-label.today {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+/* ── Weekday Chart ── */
+
+.weekday-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.weekday-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.weekday-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.weekday-label.best {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.weekday-track {
+  flex: 1;
+  height: 22px;
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.weekday-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  opacity: 0.6;
+  transition: width 0.6s ease;
+}
+
+.weekday-fill.best {
+  opacity: 1;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.weekday-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 24px;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+/* ── Two Column Layout ── */
+
+.analytics-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── Breakdown List ── */
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.breakdown-rate {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.breakdown-bar-track {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.breakdown-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
+
+.breakdown-detail {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* ── Deadline Donut ── */
+
+.deadline-stats {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.deadline-donut {
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.donut-svg {
+  width: 100px;
+  height: 100px;
+}
+
+.donut-ring {
+  fill: none;
+  stroke: var(--surface-3);
+  stroke-width: 3;
+}
+
+.donut-segment {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dasharray 0.8s ease;
+}
+
+.donut-text {
+  fill: var(--text-primary);
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.donut-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.deadline-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deadline-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.deadline-detail-item.total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.deadline-detail-item .sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot.green { background: #10b981; }
+.dot.red { background: #ef4444; }
+
+/* ── Responsive ── */
+
+@media (max-width: 800px) {
+  .analytics-metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .deadline-stats {
+    flex-direction: column;
+  }
+}

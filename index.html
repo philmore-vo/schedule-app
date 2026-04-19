@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src *; img-src 'self' data:;">
+  <meta name="description" content="TaskFlow AI — Smart task scheduler with AI-powered priority scheduling and chat assistant for people who struggle with time management.">
+  <title>TaskFlow AI — Smart Task Scheduler</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🧠</text></svg>">
+  <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+
+<div class="app-shell" id="appShell">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <button class="btn btn-ghost btn-icon" onclick="document.querySelector('.app-shell').classList.toggle('sidebar-collapsed')" title="Toggle Sidebar">☰</button>
+      <div class="app-logo">
+        <div class="logo-icon">🧠</div>
+        <span>TaskFlow <span class="gradient-text">AI</span></span>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="view-tabs" id="viewTabs">
+        <button class="view-tab active" data-sort="deadline" onclick="window.app.setSort('deadline')">📅 Deadline</button>
+        <button class="view-tab" data-sort="priority" onclick="window.app.setSort('priority')">⚡ Priority</button>
+        <button class="view-tab" data-sort="duration" onclick="window.app.setSort('duration')">⏱ Duration</button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="btn btn-ai" id="aiScheduleBtn" onclick="window.app.aiSchedule()">
+        🤖 AI Schedule
+      </button>
+      <button class="btn btn-ghost btn-icon" id="themeToggleBtn" onclick="window.app.toggleTheme()" title="Toggle Theme">🌙</button>
+      <button class="btn btn-ghost btn-icon" onclick="window.app.toggleChat()" title="Toggle AI Chat">💬</button>
+      <button class="btn btn-ghost btn-icon" onclick="window.app.openSettings()" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Views</div>
+      <div class="sidebar-item active" data-view="all" onclick="window.app.setView('all')">
+        <span class="item-icon">📋</span>
+        <span>All Tasks</span>
+        <span class="item-count" id="countAll">0</span>
+      </div>
+      <div class="sidebar-item" data-view="today" onclick="window.app.setView('today')">
+        <span class="item-icon">☀️</span>
+        <span>Today</span>
+        <span class="item-count" id="countToday">0</span>
+      </div>
+      <div class="sidebar-item" data-view="upcoming" onclick="window.app.setView('upcoming')">
+        <span class="item-icon">📅</span>
+        <span>Upcoming</span>
+        <span class="item-count" id="countUpcoming">0</span>
+      </div>
+      <div class="sidebar-item" data-view="overdue" onclick="window.app.setView('overdue')">
+        <span class="item-icon">🔥</span>
+        <span>Overdue</span>
+        <span class="item-count" id="countOverdue">0</span>
+      </div>
+      <div class="sidebar-item" data-view="completed" onclick="window.app.setView('completed')">
+        <span class="item-icon">✅</span>
+        <span>Completed</span>
+        <span class="item-count" id="countCompleted">0</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">AI</div>
+      <div class="sidebar-item" data-view="schedule" onclick="window.app.setView('schedule')">
+        <span class="item-icon">🤖</span>
+        <span>AI Schedule</span>
+        <span class="item-count" id="countSchedule">0</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Insights</div>
+      <div class="sidebar-item" data-view="analytics" onclick="window.app.setView('analytics')">
+        <span class="item-icon">📊</span>
+        <span>Analytics</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Moodle Section (hidden until configured) -->
+    <div class="sidebar-section" id="moodleSection" style="display:none;">
+      <div class="sidebar-section-title">📚 Moodle</div>
+      <div class="sidebar-item" onclick="window.app.syncMoodle()">
+        <span class="item-icon">🔄</span>
+        <span id="moodleSyncBtn">Sync Moodle</span>
+        <span class="item-count" style="font-size:10px;color:var(--text-tertiary)" id="moodleLastSync"></span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider" id="moodleDivider" style="display:none;"></div>
+
+    <div class="sidebar-section" style="margin-top:auto; padding-bottom: var(--space-4);">
+      <button class="btn btn-primary btn-lg" style="width:100%;" onclick="window.app.openTaskModal()">
+        ＋ New Task
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══════════ MAIN CONTENT ═══════════ -->
+  <main class="main-content">
+    <div class="main-header">
+      <h1 id="mainHeaderTitle">📋 All Tasks</h1>
+      <div class="main-header-actions">
+        <button class="btn btn-secondary" onclick="window.app.openTaskModal()">＋ Add Task</button>
+      </div>
+    </div>
+    <div class="task-list-container" id="taskListContainer">
+      <!-- Tasks render here -->
+    </div>
+  </main>
+
+  <!-- ═══════════ CHAT PANEL ═══════════ -->
+  <aside class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+      <div class="chat-header-title">
+        <span>🤖</span>
+        <span>AI Assistant</span>
+        <div class="ai-status">
+          <span class="ai-status-dot" id="aiStatusDot"></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-icon" onclick="window.app.clearChat()" title="Clear Chat" style="font-size:14px;">🗑️</button>
+        <button class="btn btn-ghost btn-icon" onclick="window.app.toggleChat()" title="Close Chat" style="font-size:14px;">✕</button>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <!-- Chat messages render here -->
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <textarea class="chat-input" id="chatInput" placeholder="Ask AI anything..." rows="1"></textarea>
+        <button class="chat-send-btn" id="chatSendBtn" onclick="window.app.sendChat()">➤</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <footer class="app-footer">
+    <div class="footer-stat">
+      <span class="stat-icon">📋</span>
+      <span id="footerTotal">0 tasks</span>
+    </div>
+    <div class="footer-stat">
+      <span class="stat-icon">⏱</span>
+      <span id="footerEstimated">0h</span>
+    </div>
+    <div class="footer-stat">
+      <span class="stat-icon">✅</span>
+      <span id="footerCompleted">0 done</span>
+    </div>
+    <div class="footer-stat" style="color: var(--accent-danger);">
+      <span class="stat-icon">🔥</span>
+      <span id="footerOverdue"></span>
+    </div>
+    <div class="footer-info" style="margin-left:auto; font-size:var(--font-size-xs); color:var(--text-tertiary);">
+      💾 TaskFlow AI v1.0 • Ctrl+N: New Task • Ctrl+Shift+A: AI Schedule
+    </div>
+  </footer>
+</div>
+
+<!-- ═══════════ TASK MODAL ═══════════ -->
+<div class="modal-overlay" id="taskModalOverlay" onclick="if(event.target===this) window.app.closeTaskModal()">
+  <div class="modal" id="taskModal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="taskModalTitle">New Task</h2>
+      <button class="btn btn-ghost btn-icon" onclick="window.app.closeTaskModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="taskFormId">
+
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input type="text" class="form-input" id="taskFormTitle" placeholder="What do you need to do?" autofocus>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="taskFormDescription" placeholder="Add details..." rows="3"></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">📅 Deadline</label>
+          <input type="datetime-local" class="form-input" id="taskFormDeadline">
+        </div>
+        <div class="form-group">
+          <label class="form-label">⏱ Estimated (minutes)</label>
+          <input type="number" class="form-input" id="taskFormDuration" placeholder="60" min="5" step="5" value="60">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">📁 Category</label>
+          <select class="form-select" id="taskFormCategory">
+            <option value="work">💼 Work</option>
+            <option value="personal">🏠 Personal</option>
+            <option value="study">📚 Study</option>
+            <option value="health">💪 Health</option>
+            <option value="finance">💰 Finance</option>
+            <option value="other" selected>📌 Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">⚡ Priority</label>
+          <select class="form-select" id="taskFormPriority">
+            <option value="low">🟢 Low</option>
+            <option value="medium" selected>🟣 Medium</option>
+            <option value="high">🟡 High</option>
+            <option value="critical">🔴 Critical</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">📝 Subtasks</label>
+        <div id="taskFormSubtasks"></div>
+        <button type="button" class="btn btn-ghost" onclick="window.app.addSubtaskInput()" style="margin-top:4px;font-size:var(--font-size-sm);">＋ Add subtask</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="window.app.closeTaskModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="window.app.submitTaskForm()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SETTINGS MODAL ═══════════ -->
+<div class="modal-overlay" id="settingsModalOverlay" onclick="if(event.target===this) window.app.closeSettings()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">⚙️ Settings</h2>
+      <button class="btn btn-ghost btn-icon" onclick="window.app.closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-section">
+        <div class="settings-section-title">🤖 AI Configuration</div>
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <input type="password" class="form-input" id="settingApiKey" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Endpoint</label>
+          <input type="text" class="form-input" id="settingApiEndpoint" placeholder="https://generativelanguage.googleapis.com/v1beta/openai">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Model</label>
+          <input type="text" class="form-input" id="settingModel" placeholder="gemini-2.0-flash">
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🕐 Schedule Preferences</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Work Start (hour)</label>
+            <input type="number" class="form-input" id="settingWorkStart" min="0" max="23" value="8">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Work End (hour)</label>
+            <input type="number" class="form-input" id="settingWorkEnd" min="0" max="23" value="22">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Break between tasks (min)</label>
+            <input type="number" class="form-input" id="settingBreak" min="0" max="60" value="15">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default task duration (min)</label>
+            <input type="number" class="form-input" id="settingDefaultDuration" min="5" max="480" value="60">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🔔 Thông báo Deadline</div>
+        <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:12px;">
+          Nhận thông báo desktop trước deadline: 3 ngày, 1 ngày, 8 tiếng, và 1 tiếng.
+        </p>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="settingNotifications" style="width:18px;height:18px;">
+            <span style="font-size:var(--font-size-sm);color:var(--text-secondary);">Bật thông báo deadline</span>
+          </label>
+        </div>
+        <p id="notificationStatus" style="font-size:var(--font-size-xs);color:var(--text-tertiary);margin-top:4px;"></p>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">📚 Moodle Integration</div>
+        <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:12px;">
+          Kết nối Moodle để tự động import deadline bài tập.
+          <a href="#" onclick="event.preventDefault();window.app.showMoodleHelp()" style="color:var(--accent-primary);">Hướng dẫn lấy token ↗</a>
+        </p>
+        <div class="form-group">
+          <label class="form-label">Moodle URL</label>
+          <input type="text" class="form-input" id="settingMoodleUrl" placeholder="https://moodle.truonghoc.edu.vn">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moodle Token</label>
+          <input type="password" class="form-input" id="settingMoodleToken" placeholder="Paste token từ Moodle...">
+        </div>
+        <div class="form-row" style="align-items:center;">
+          <div class="form-group" style="flex:1;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--font-size-sm);color:var(--text-secondary);">
+              <input type="checkbox" id="settingMoodleAutoSync"> Tự động sync khi mở app
+            </label>
+          </div>
+          <button class="btn btn-secondary" onclick="window.app.testMoodle()" style="font-size:var(--font-size-sm);">
+            🔍 Test kết nối
+          </button>
+        </div>
+        <div id="moodleTestResult" style="font-size:var(--font-size-sm);margin-top:4px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="window.app.closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="window.app.saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SCHEDULE MODAL ═══════════ -->
+<div class="modal-overlay" id="scheduleModalOverlay" onclick="if(event.target===this) window.app.closeSchedule()">
+  <div class="modal modal-schedule">
+    <div class="modal-header">
+      <h2 class="modal-title">🤖 AI Schedule</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-danger" onclick="window.app.clearSchedule()">Clear</button>
+        <button class="btn btn-ghost btn-icon" onclick="window.app.closeSchedule()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+      <div id="scheduleTimelineContent">
+        <!-- Timeline renders here -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="window.app.closeSchedule()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ TOAST CONTAINER ═══════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
