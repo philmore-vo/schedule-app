@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd 'd:\\\\__test\\\\schedule-app'; git ls-tree -r HEAD \\| Select-String node_modules$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
