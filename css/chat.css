@@ -242,3 +242,38 @@
   background: var(--accent-warning);
   animation: pulse 1.5s ease infinite;
 }
+
+/* ── AI Agent Action Results ── */
+.chat-actions-result {
+  padding: 4px 0 4px 42px;
+  animation: fadeSlideUp 0.3s ease;
+}
+
+.action-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.action-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  animation: fadeSlideUp 0.3s ease;
+}
+
+.action-badge.success {
+  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  color: var(--accent-success);
+  border: 1px solid color-mix(in srgb, var(--accent-success) 30%, transparent);
+}
+
+.action-badge.error {
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
+  border: 1px solid color-mix(in srgb, var(--accent-danger) 30%, transparent);
+}

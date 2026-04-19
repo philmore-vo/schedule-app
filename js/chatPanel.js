@@ -4,7 +4,9 @@
 
 import { store } from './store.js';
 import { chatWithAI } from './aiService.js';
-import { markdownToHtml } from './utils.js';
+import { markdownToHtml, generateId } from './utils.js';
+import { createTask, updateTask, deleteTask, toggleTask } from './taskManager.js';
+import { showToast, renderAll } from './uiRenderer.js';
 
 let isStreaming = false;
 
@@ -68,11 +70,30 @@ export async function sendMessage(text = null) {
 
     await chatWithAI(message, (chunk) => {
       fullText += chunk;
-      updateAssistantBubble(assistantDiv, fullText);
+      // Show text without actions block during streaming
+      const displayText = fullText.split('---ACTIONS---')[0].trim();
+      updateAssistantBubble(assistantDiv, displayText);
     });
 
-    // Save assistant message
-    store.addChatMessage({ role: 'assistant', content: fullText });
+    // Parse and execute actions
+    const { text, actions } = parseAIResponse(fullText);
+
+    // Update bubble with clean text (without actions JSON)
+    updateAssistantBubble(assistantDiv, text);
+
+    // Execute actions if any
+    if (actions.length > 0) {
+      const results = executeActions(actions);
+      // Show action results in chat
+      if (results.length > 0) {
+        appendActionResults(results);
+      }
+      // Refresh task list
+      renderAll();
+    }
+
+    // Save assistant message (text only, not actions JSON)
+    store.addChatMessage({ role: 'assistant', content: text });
   } catch (error) {
     removeTypingIndicator();
     appendMessage('assistant', `⚠️ ${error.message}`);
@@ -246,3 +267,156 @@ function escHtml(str) {
   d.textContent = str;
   return d.innerHTML;
 }
+
+/* ══════════════════════════════════════════════
+   AI AGENT: Parse & Execute Actions
+   ══════════════════════════════════════════════ */
+
+/**
+ * Parse AI response to separate text from action commands
+ */
+function parseAIResponse(fullText) {
+  const marker = '---ACTIONS---';
+  const markerIdx = fullText.indexOf(marker);
+
+  if (markerIdx === -1) {
+    return { text: fullText.trim(), actions: [] };
+  }
+
+  const text = fullText.substring(0, markerIdx).trim();
+  const actionsStr = fullText.substring(markerIdx + marker.length).trim();
+
+  try {
+    // Extract JSON array from the actions string
+    let jsonStr = actionsStr;
+
+    // Remove markdown code fences if present
+    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      jsonStr = fenceMatch[1].trim();
+    }
+
+    // Find array
+    const arrStart = jsonStr.indexOf('[');
+    const arrEnd = jsonStr.lastIndexOf(']');
+    if (arrStart !== -1 && arrEnd !== -1) {
+      jsonStr = jsonStr.substring(arrStart, arrEnd + 1);
+    }
+
+    const actions = JSON.parse(jsonStr);
+    return { text, actions: Array.isArray(actions) ? actions : [actions] };
+  } catch (e) {
+    console.warn('Failed to parse AI actions:', actionsStr, e);
+    return { text, actions: [] };
+  }
+}
+
+/**
+ * Execute AI agent actions
+ */
+function executeActions(actions) {
+  const results = [];
+
+  for (const action of actions) {
+    try {
+      switch (action.action) {
+        case 'create_task': {
+          const task = createTask({
+            title: action.title || 'Untitled Task',
+            description: action.description || '',
+            deadline: action.deadline || '',
+            estimatedMinutes: action.estimatedMinutes || 60,
+            category: action.category || 'other',
+            priority: action.priority || 'medium',
+            subtasks: action.subtasks || [],
+          });
+          results.push({ type: 'created', title: action.title, success: true });
+          break;
+        }
+
+        case 'update_task': {
+          if (!action.id) {
+            results.push({ type: 'error', message: 'Missing task ID for update' });
+            break;
+          }
+          const updated = updateTask(action.id, action.updates || {});
+          if (updated) {
+            results.push({ type: 'updated', title: updated.title, success: true });
+          } else {
+            results.push({ type: 'error', message: `Task not found: ${action.id}` });
+          }
+          break;
+        }
+
+        case 'delete_task': {
+          if (!action.id) {
+            results.push({ type: 'error', message: 'Missing task ID for delete' });
+            break;
+          }
+          const task = store.getTask(action.id);
+          if (task) {
+            deleteTask(action.id);
+            results.push({ type: 'deleted', title: task.title, success: true });
+          } else {
+            results.push({ type: 'error', message: `Task not found: ${action.id}` });
+          }
+          break;
+        }
+
+        case 'complete_task': {
+          if (!action.id) {
+            results.push({ type: 'error', message: 'Missing task ID for complete' });
+            break;
+          }
+          const task = store.getTask(action.id);
+          if (task) {
+            if (!task.completed) toggleTask(action.id);
+            results.push({ type: 'completed', title: task.title, success: true });
+          } else {
+            results.push({ type: 'error', message: `Task not found: ${action.id}` });
+          }
+          break;
+        }
+
+        default:
+          results.push({ type: 'error', message: `Unknown action: ${action.action}` });
+      }
+    } catch (e) {
+      console.error('Action execution error:', e);
+      results.push({ type: 'error', message: e.message });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Show action results as visual badges in chat
+ */
+function appendActionResults(results) {
+  const container = document.getElementById('chatMessages');
+  if (!container) return;
+
+  const div = document.createElement('div');
+  div.className = 'chat-actions-result';
+
+  const icons = {
+    created: '✅ Created',
+    updated: '✏️ Updated',
+    deleted: '🗑️ Deleted',
+    completed: '☑️ Completed',
+    error: '⚠️ Error',
+  };
+
+  const badges = results.map(r => {
+    const label = icons[r.type] || r.type;
+    const detail = r.title || r.message || '';
+    const cls = r.type === 'error' ? 'action-badge error' : 'action-badge success';
+    return `<span class="${cls}">${label}: ${escHtml(detail)}</span>`;
+  }).join('');
+
+  div.innerHTML = `<div class="action-badges">${badges}</div>`;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
