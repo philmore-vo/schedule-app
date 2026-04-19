@@ -1,0 +1,326 @@
+/* ============================================
+   TaskFlow AI — Timeline (Gantt) View
+   ============================================ */
+
+.timeline-view {
+  --tl-label-w: 260px;
+  --tl-row-h: 56px;
+  --tl-axis-h: 48px;
+
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  animation: fadeSlideUp 0.3s ease;
+}
+
+/* ── Header row with axis ── */
+.tl-header {
+  display: grid;
+  grid-template-columns: var(--tl-label-w) 1fr;
+  height: var(--tl-axis-h);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.tl-label-header {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-right: 1px solid var(--border-color);
+}
+
+.tl-axis {
+  position: relative;
+  height: 100%;
+}
+
+.tl-axis-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+.tl-axis-label {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ── Body and rows ── */
+.tl-body {
+  position: relative;
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+
+.tl-row {
+  display: grid;
+  grid-template-columns: var(--tl-label-w) 1fr;
+  min-height: var(--tl-row-h);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  transition: background var(--transition-fast);
+}
+
+.tl-row:last-child {
+  border-bottom: none;
+}
+
+.tl-row:hover {
+  background: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+/* ── Left label cell ── */
+.tl-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.tl-ai-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tl-ai-num.pending {
+  background: var(--bg-glass);
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-color);
+}
+
+.tl-label-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.tl-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-wrap: wrap;
+}
+
+.tl-meta .priority-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+/* ── Track area (right column) ── */
+.tl-track {
+  position: relative;
+  height: 100%;
+  min-height: var(--tl-row-h);
+}
+
+/* Background grid lines aligned to axis marks */
+.tl-track .tl-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--border-color) 30%, transparent);
+  pointer-events: none;
+}
+
+/* Task bar */
+.tl-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 26px;
+  min-width: 4px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+
+.tl-bar:hover {
+  filter: brightness(1.15);
+  transform: translateY(-50%) scale(1.02);
+  z-index: 3;
+}
+
+.tl-bar.ai-scheduled {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.tl-bar.pending {
+  background: color-mix(in srgb, var(--text-tertiary) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-tertiary) 60%, transparent);
+}
+
+.tl-bar.priority-critical:not(.ai-scheduled) {
+  background: color-mix(in srgb, var(--accent-danger) 75%, transparent);
+}
+.tl-bar.priority-high:not(.ai-scheduled) {
+  background: color-mix(in srgb, var(--accent-warning) 75%, transparent);
+}
+.tl-bar.priority-medium:not(.ai-scheduled) {
+  background: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+.tl-bar.priority-low:not(.ai-scheduled) {
+  background: color-mix(in srgb, var(--accent-success) 55%, transparent);
+}
+
+.tl-bar.overdue {
+  background: linear-gradient(135deg, var(--accent-danger), #b91c1c);
+  animation: pulse 2s ease infinite;
+}
+
+.tl-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Deadline flag */
+.tl-deadline-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-danger);
+  pointer-events: none;
+}
+
+.tl-deadline-marker::before {
+  content: '🚩';
+  position: absolute;
+  top: 2px;
+  left: -7px;
+  font-size: 14px;
+  pointer-events: auto;
+}
+
+.tl-deadline-marker.urgent {
+  background: var(--accent-warning);
+}
+
+/* Now line */
+.tl-now-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-success);
+  z-index: 4;
+  pointer-events: none;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-success) 60%, transparent);
+}
+
+.tl-now-line::before {
+  content: 'NOW';
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  background: var(--accent-success);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+/* Empty state specific to timeline */
+.tl-empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+/* Legend */
+.tl-legend {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.tl-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tl-legend-swatch {
+  width: 16px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.tl-legend-swatch.ai {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.tl-legend-swatch.pending {
+  background: color-mix(in srgb, var(--text-tertiary) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-tertiary) 60%, transparent);
+}
+
+.tl-legend-swatch.overdue {
+  background: var(--accent-danger);
+}
+
+@media (max-width: 900px) {
+  .timeline-view {
+    --tl-label-w: 180px;
+  }
+  .tl-meta {
+    display: none;
+  }
+}

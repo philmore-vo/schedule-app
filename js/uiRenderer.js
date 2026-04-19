@@ -49,6 +49,7 @@ export function renderMainContent() {
     overdue: '🔥 Overdue',
     completed: '✅ Completed',
     schedule: '🤖 AI Schedule',
+    timeline: '📈 Timeline',
     analytics: '📊 Analytics',
   };
 
@@ -60,6 +61,11 @@ export function renderMainContent() {
   // Analytics view renders its own dashboard
   if (currentView === 'analytics') {
     renderAnalyticsDashboard();
+    return;
+  }
+
+  if (currentView === 'timeline') {
+    renderTimelineView();
     return;
   }
 
@@ -97,6 +103,216 @@ export function renderTaskList() {
         <span>Add a task...</span>
       </div>
     ` : ''}
+  `;
+}
+
+/* ══════════════════════════════════════════════
+   TIMELINE VIEW (Gantt-style)
+   ══════════════════════════════════════════════ */
+
+/**
+ * Compute the time window each task should occupy on the timeline.
+ *   - AI-scheduled → [aiStartTime, aiEndTime]
+ *   - Has deadline → [deadline - estimatedMinutes, deadline]
+ *   - Only estimated duration → [now, now + estimatedMinutes]
+ */
+function computeTimelineItems() {
+  const now = Date.now();
+  const tasks = store.getTasks().filter(t => !t.completed);
+
+  const items = tasks.map(t => {
+    const hasSchedule = !!(t.aiStartTime && t.aiEndTime);
+    let start, end;
+
+    if (hasSchedule) {
+      start = new Date(t.aiStartTime).getTime();
+      end = new Date(t.aiEndTime).getTime();
+    } else if (t.deadline) {
+      const dl = new Date(t.deadline).getTime();
+      const dur = Math.max((t.estimatedMinutes || 60) * 60000, 15 * 60000);
+      start = dl - dur;
+      end = dl;
+    } else {
+      start = now;
+      end = now + Math.max((t.estimatedMinutes || 60) * 60000, 15 * 60000);
+    }
+
+    return {
+      task: t,
+      start,
+      end,
+      deadline: t.deadline ? new Date(t.deadline).getTime() : null,
+      hasSchedule,
+    };
+  });
+
+  // AI-scheduled first (by aiPriority asc), then unscheduled by deadline asc
+  items.sort((a, b) => {
+    if (a.hasSchedule && b.hasSchedule) {
+      return (a.task.aiPriority || 999) - (b.task.aiPriority || 999);
+    }
+    if (a.hasSchedule) return -1;
+    if (b.hasSchedule) return 1;
+    const ad = a.deadline ?? Infinity;
+    const bd = b.deadline ?? Infinity;
+    return ad - bd;
+  });
+
+  return items;
+}
+
+/**
+ * Choose a sensible axis tick interval for the given span.
+ */
+function buildAxisMarks(rangeStart, rangeEnd) {
+  const span = rangeEnd - rangeStart;
+  const DAY = 24 * 3600 * 1000;
+  let stepMs;
+  let fmt;
+
+  if (span <= 2 * DAY) {
+    stepMs = 6 * 3600 * 1000;
+    fmt = d => d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', hour12: true });
+  } else if (span <= 14 * DAY) {
+    stepMs = DAY;
+    fmt = d => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } else if (span <= 60 * DAY) {
+    stepMs = 7 * DAY;
+    fmt = d => d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } else {
+    stepMs = 30 * DAY;
+    fmt = d => d.toLocaleDateString([], { month: 'short', year: 'numeric' });
+  }
+
+  // Round up the first tick to the next whole stepMs boundary (aligned at UTC midnight for daily+).
+  const marks = [];
+  const first = new Date(rangeStart);
+  first.setMinutes(0, 0, 0);
+  let t = Math.ceil(first.getTime() / stepMs) * stepMs;
+  const safetyMax = 200;
+  let count = 0;
+  while (t <= rangeEnd && count < safetyMax) {
+    marks.push({ time: t, label: fmt(new Date(t)) });
+    t += stepMs;
+    count++;
+  }
+  return marks;
+}
+
+export function renderTimelineView() {
+  const container = document.getElementById('taskListContainer');
+  if (!container) return;
+
+  const items = computeTimelineItems();
+
+  if (items.length === 0) {
+    container.innerHTML = renderEmptyState('timeline');
+    return;
+  }
+
+  const now = Date.now();
+  const minStart = Math.min(now, ...items.map(i => i.start));
+  const maxEnd = Math.max(
+    now + 60 * 60000,
+    ...items.map(i => Math.max(i.end, i.deadline ?? 0))
+  );
+  const padding = Math.max((maxEnd - minStart) * 0.05, 30 * 60000);
+  const rangeStart = minStart - padding;
+  const rangeEnd = maxEnd + padding;
+  const totalMs = rangeEnd - rangeStart;
+
+  const marks = buildAxisMarks(rangeStart, rangeEnd);
+  const pct = t => ((t - rangeStart) / totalMs) * 100;
+
+  const axisHtml = marks.map(m => `
+    <div class="tl-axis-mark" style="left:${pct(m.time).toFixed(2)}%">
+      <div class="tl-axis-label">${escHtml(m.label)}</div>
+    </div>
+  `).join('');
+
+  const gridlinesHtml = marks.map(m => `
+    <div class="tl-gridline" style="left:${pct(m.time).toFixed(2)}%"></div>
+  `).join('');
+
+  const rowsHtml = items.map(item => {
+    const { task } = item;
+    const leftPct = pct(item.start);
+    const widthPct = Math.max(pct(item.end) - leftPct, 0.6);
+    const deadlinePct = item.deadline !== null ? pct(item.deadline) : null;
+    const isOverdue = item.deadline !== null && item.deadline < now;
+    const deadlineStatus = item.deadline !== null ? getDeadlineStatus(new Date(item.deadline).toISOString()) : '';
+
+    const barClasses = ['tl-bar'];
+    if (item.hasSchedule) {
+      barClasses.push('ai-scheduled');
+    } else {
+      barClasses.push('pending', `priority-${task.priority}`);
+    }
+    if (isOverdue) barClasses.push('overdue');
+
+    const startStr = new Date(item.start).toLocaleString();
+    const endStr = new Date(item.end).toLocaleString();
+    const barTooltip = escAttr(`${task.title}\n${startStr} → ${endStr}${task.aiReason ? `\n\nAI: ${task.aiReason}` : ''}`);
+
+    const rankBadge = item.hasSchedule
+      ? `<span class="tl-ai-num" title="AI priority #${task.aiPriority}">#${task.aiPriority}</span>`
+      : `<span class="tl-ai-num pending" title="Not scheduled by AI">—</span>`;
+
+    const deadlineLabel = item.deadline !== null ? formatRelativeTime(new Date(item.deadline).toISOString()) : '';
+
+    return `
+      <div class="tl-row">
+        <div class="tl-label" onclick="window.app.editTask('${task.id}')" title="Click to edit">
+          ${rankBadge}
+          <div class="tl-label-text">
+            <div class="tl-title">${escHtml(task.title)}</div>
+            <div class="tl-meta">
+              <span class="priority-badge ${task.priority}">${getPriorityLabel(task.priority)}</span>
+              ${item.deadline !== null ? `<span class="${deadlineStatus}">📅 ${escHtml(deadlineLabel)}</span>` : ''}
+              <span>⏱ ${escHtml(formatDuration(task.estimatedMinutes))}</span>
+            </div>
+          </div>
+        </div>
+        <div class="tl-track">
+          ${gridlinesHtml}
+          <div class="${barClasses.join(' ')}"
+               style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%"
+               title="${barTooltip}"
+               onclick="window.app.editTask('${task.id}')">
+            <span class="tl-bar-label">${escHtml(task.title)}</span>
+          </div>
+          ${deadlinePct !== null ? `
+            <div class="tl-deadline-marker ${deadlineStatus === 'urgent' ? 'urgent' : ''}"
+                 style="left:${deadlinePct.toFixed(2)}%"
+                 title="Deadline: ${escAttr(formatDate(new Date(item.deadline).toISOString()))}"></div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const nowPct = pct(now);
+  const nowWithinRange = nowPct >= 0 && nowPct <= 100;
+
+  container.innerHTML = `
+    <div class="timeline-view">
+      <div class="tl-header">
+        <div class="tl-label-header">Task</div>
+        <div class="tl-axis">${axisHtml}</div>
+      </div>
+      <div class="tl-body">
+        ${nowWithinRange ? `
+          <div class="tl-now-line" style="left:calc(var(--tl-label-w) + (100% - var(--tl-label-w)) * ${nowPct.toFixed(2)} / 100)"></div>
+        ` : ''}
+        ${rowsHtml}
+      </div>
+      <div class="tl-legend">
+        <span class="tl-legend-item"><span class="tl-legend-swatch ai"></span>AI-scheduled (bar width = planned duration)</span>
+        <span class="tl-legend-item"><span class="tl-legend-swatch pending"></span>Not scheduled (bar ends at deadline)</span>
+        <span class="tl-legend-item"><span class="tl-legend-swatch overdue"></span>Overdue</span>
+        <span class="tl-legend-item">🚩 Deadline</span>
+      </div>
+    </div>
   `;
 }
 
@@ -161,6 +377,7 @@ function renderEmptyState(view) {
     overdue: { icon: '🎉', title: 'No overdue tasks!', text: 'Great job staying on top of your deadlines!' },
     completed: { icon: '📭', title: 'No completed tasks', text: 'Complete some tasks to see them here.' },
     schedule: { icon: '🤖', title: 'No AI schedule yet', text: 'Click "AI Schedule" to let AI prioritize your tasks.' },
+    timeline: { icon: '📈', title: 'Nothing to plot yet', text: 'Add tasks with deadlines to see them on the timeline.' },
   };
   const m = messages[view] || messages.all;
   return `
@@ -193,6 +410,7 @@ export function updateSidebarCounts() {
   setText('countCompleted', stats.completed);
   const schedule = getFilteredTasks('schedule');
   setText('countSchedule', schedule.length);
+  setText('countTimeline', stats.active);
 }
 
 /**
@@ -461,4 +679,14 @@ function escHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function escAttr(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

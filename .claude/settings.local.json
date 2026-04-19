@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(node --check js/aiService.js)",
-      "Bash(node --check js/chatPanel.js)"
+      "Bash(node --check js/chatPanel.js)",
+      "Bash(node --check js/uiRenderer.js)"
     ]
   }
 }
