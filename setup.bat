@@ -19,7 +19,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     set "NODE_URL=https://nodejs.org/dist/v22.13.1/node-v22.13.1-x64.msi"
     set "NODE_INSTALLER=%TEMP%\node-installer.msi"
-    powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!NODE_URL!' -OutFile '!NODE_INSTALLER!' -UseBasicParsing }"
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!NODE_URL!' -OutFile '!NODE_INSTALLER!' -UseBasicParsing"
     if not exist "!NODE_INSTALLER!" (
         echo  FAILED to download Node.js.
         echo  Please download from: https://nodejs.org
@@ -51,15 +51,8 @@ echo.
 echo [3/4] Create Desktop shortcut? (Y/N)
 set /p SHORTCUT="  > "
 if /i "%SHORTCUT%"=="Y" (
-    set "VBS=%TEMP%\mklink.vbs"
-    echo Set s=WScript.CreateObject("WScript.Shell") > "!VBS!"
-    echo Set l=s.CreateShortcut(s.SpecialFolders("Desktop")^&"\TaskFlow AI.lnk") >> "!VBS!"
-    echo l.TargetPath="%~dp0start-app.bat" >> "!VBS!"
-    echo l.WorkingDirectory="%~dp0" >> "!VBS!"
-    echo l.WindowStyle=7 >> "!VBS!"
-    echo l.Save >> "!VBS!"
-    cscript //nologo "!VBS!"
-    del "!VBS!" >nul 2>&1
+    echo  Creating shortcut...
+    powershell -Command " = New-Object -ComObject WScript.Shell;  = .CreateShortcut([Environment]::GetFolderPath('Desktop') + '\TaskFlow AI.lnk'); .TargetPath = '%~dp0start-app.bat'; .WorkingDirectory = '%~dp0'; .WindowStyle = 7; .Save()"
     echo  Shortcut created on Desktop!
 )
 
