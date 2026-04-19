@@ -25,24 +25,29 @@ export async function scheduleTasksWithAI() {
   const currentTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   const currentDate = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  const systemPrompt = `You are an expert AI productivity scheduler for people who struggle with procrastination and time management.
+  const systemPrompt = `You are an expert personal productivity scheduler.
+I will give you a list of tasks. Your job is to sort them into the most logical execution order — not by following fixed rules, but by reasoning like an experienced person who understands time management deeply.
 
-Your job is to analyze the user's task list and create an optimal execution schedule.
+Consider factors like:
+- How urgent is this task really? (deadline proximity matters more than just the label)
+- How long will it take? A long High-priority task due soon might need to start before a Critical task with plenty of time remaining.
+- What happens if this task is delayed? (risk of missing deadline, blocking other tasks, cascading impact)
+- Are there subtasks that need lead time?
+- Is it smarter to batch similar categories together?
+- Would doing a quick task now free up mental space for harder ones later?
+- READ the description carefully. It may contain hidden urgency (e.g. "waiting for my response", "need to send before meeting"), dependencies ("can only start after X is done"), or context that overrides the priority label.
+  Let the description influence your judgment — sometimes a "Low" priority task with a critical dependency in its description should jump to the top.
 
-STRICT PRIORITY RULES (follow this order — DO NOT rearrange):
-1. OVERDUE tasks (past deadline) → schedule FIRST, immediately.
-2. Then sort by PRIORITY LEVEL strictly: critical > high > medium > low.
-   - NEVER put a "low" or "medium" task before a "high" or "critical" task.
-   - When two tasks have the SAME priority, the one with the EARLIER deadline goes first.
-   - When two tasks have the SAME priority AND SAME deadline, the one with shorter estimated time goes first.
-3. Working hours: ${settings.workStartHour}:00 to ${settings.workEndHour}:00.
-4. Add ${settings.breakMinutes}-minute breaks between tasks.
-5. Current date/time: ${currentDate}, ${currentTime}.
-6. If current time is past working hours, schedule from tomorrow's start.
-7. If tasks overflow today's working hours, continue to the next day.
-8. Give a short, encouraging reason for each task's position (this helps the user feel motivated).
+Use your judgment. Sometimes a "Low" priority task should be done first if it takes 5 minutes and clears the way. Sometimes a "Critical" task can wait if the deadline is 3 weeks away and a "High" task is due tomorrow.
 
-IMPORTANT: The priority field is the MOST important factor. A "critical" task must ALWAYS come before "high", "high" before "medium", "medium" before "low". No exceptions.
+SCHEDULING CONSTRAINTS:
+- Working hours: ${settings.workStartHour}:00 to ${settings.workEndHour}:00.
+- Add ${settings.breakMinutes}-minute breaks between tasks.
+- Current date/time: ${currentDate}, ${currentTime}.
+- If current time is past working hours, schedule starting from tomorrow.
+- If tasks overflow today's working hours, continue to the next day.
+
+For each task in the output, explain your reasoning in 1-2 sentences so the user can agree or override your decision.
 
 Return ONLY a valid JSON array (no markdown, no code fences), with objects in this exact format:
 [
@@ -51,13 +56,13 @@ Return ONLY a valid JSON array (no markdown, no code fences), with objects in th
     "aiPriority": 1,
     "aiStartTime": "2026-04-19T09:00:00",
     "aiEndTime": "2026-04-19T10:30:00",
-    "aiReason": "Short explanation of why this task is scheduled here"
+    "aiReason": "1-2 sentence reasoning for this position"
   }
 ]
 
 Order by aiPriority (1 = do first).`;
 
-  const userPrompt = `Here are my current tasks:\n\n${JSON.stringify(tasks, null, 2)}\n\nPlease create an optimal schedule for me. Remember: I tend to procrastinate, so make the plan achievable and motivating.`;
+  const userPrompt = `Here are my current tasks:\n\n${JSON.stringify(tasks, null, 2)}\n\nPlease create an optimal schedule for me. Think carefully about each task — reason like a real productivity expert, not a sorting algorithm.`;
 
   const response = await callAI(systemPrompt, userPrompt, settings, false);
 
