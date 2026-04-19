@@ -51,17 +51,35 @@
 
 ## 🚀 Cài đặt (Dành cho người mới)
 
-### Cách 1: Cài đặt tự động (Khuyên dùng) ⭐
+### 📥 Bước 1: Tải app về máy
 
-1. **Tải về** thư mục `schedule-app` về máy
-2. **Click đúp** vào file **`setup.bat`**
-3. Chương trình sẽ tự động:
-   - ✅ Kiểm tra máy đã có Node.js chưa
-   - ✅ Tải và cài Node.js nếu cần
+<p align="center">
+  <a href="https://github.com/philmore-vo/schedule-app/archive/refs/heads/main.zip">
+    <img src="https://img.shields.io/badge/⬇️_TẢI_VỀ_MÁY-TaskFlow_AI-7c3aed?style=for-the-badge&logo=windows&logoColor=white" alt="Download" />
+  </a>
+</p>
+
+> 👆 **Nhấn nút trên** hoặc copy link này vào trình duyệt:
+> ```
+> https://github.com/philmore-vo/schedule-app/archive/refs/heads/main.zip
+> ```
+
+### 📂 Bước 2: Giải nén
+
+1. Sau khi tải về, bạn sẽ có file **`schedule-app-main.zip`**
+2. **Click chuột phải** → chọn **"Extract All..."** (Giải nén tất cả)
+3. Chọn nơi lưu (ví dụ: Desktop) → nhấn **Extract**
+4. Mở thư mục **`schedule-app-main`** vừa giải nén
+
+### ⚡ Bước 3: Cài đặt tự động (1 click)
+
+1. **Click đúp** vào file **`setup.bat`** trong thư mục vừa giải nén
+2. Chương trình setup sẽ tự động:
+   - ✅ Kiểm tra và cài Node.js (nếu máy chưa có)
    - ✅ Cài đặt thư viện Electron
    - ✅ Hỏi bạn có muốn tạo shortcut trên Desktop không
    - ✅ Hỏi bạn có muốn chạy app ngay không
-4. **Xong!** Từ giờ chỉ cần click **"TaskFlow AI"** trên Desktop để mở app.
+3. **Xong!** Từ giờ chỉ cần click **"TaskFlow AI"** trên Desktop để mở app.
 
 ### Cách 2: Cài đặt thủ công
 
