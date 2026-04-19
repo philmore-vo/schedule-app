@@ -252,46 +252,129 @@ export async function syncMoodle() {
       }
     }
 
-    // Get existing moodle tasks to avoid duplicates
+    // Get existing moodle tasks
     const existingTasks = store.getTasks();
-    const existingMoodleIds = new Set(
-      existingTasks
-        .filter(t => t.moodleSource)
-        .map(t => String(t.moodleId))
-    );
+    const existingMoodleTasks = existingTasks.filter(t => t.moodleSource);
+    const existingMoodleMap = new Map();
+    for (const t of existingMoodleTasks) {
+      if (t.moodleId) existingMoodleMap.set(String(t.moodleId), t);
+    }
     const existingTitles = new Set(
-      existingTasks.map(t => t.title.toLowerCase())
+      existingTasks.filter(t => !t.moodleSource).map(t => t.title.toLowerCase())
     );
+
+    // Track which moodle IDs are still on the server
+    const serverMoodleIds = new Set();
 
     // Convert to tasks
     let imported = 0;
+    let updated = 0;
     let skipped = 0;
 
     for (const event of allEvents) {
-      const task = moodleEventToTask(event);
-      if (!task) {
+      // Get moodle ID for this event
+      const moodleId = String(event.id || event.cmid || `assign_${event.id}`);
+      serverMoodleIds.add(moodleId);
+
+      // Parse deadline
+      const deadline = event.timestart
+        ? new Date(event.timestart * 1000).toISOString()
+        : (event.duedate ? new Date(event.duedate * 1000).toISOString() : null);
+
+      if (!deadline) {
         skipped++;
         continue;
       }
 
-      // Check for duplicates
-      const moodleIdStr = String(task.moodleId);
-      if (existingMoodleIds.has(moodleIdStr) || existingTitles.has(task.title.toLowerCase())) {
+      const title = event.name || event.activityname || 'Untitled Moodle Event';
+      const courseName = event.course?.fullname || event.courseName || '';
+      const description = courseName
+        ? `📚 ${courseName}\n${stripHtml(event.description || '')}`
+        : stripHtml(event.description || '');
+
+      // Check if task already exists
+      const existingTask = existingMoodleMap.get(moodleId);
+
+      if (existingTask) {
+        // UPDATE existing task if deadline or title changed
+        const existingDeadline = existingTask.deadline ? new Date(existingTask.deadline).getTime() : 0;
+        const newDeadline = new Date(deadline).getTime();
+        const needsUpdate = existingDeadline !== newDeadline || existingTask.title !== title;
+
+        if (needsUpdate && !existingTask.completed) {
+          store.updateTask(existingTask.id, {
+            title: title,
+            deadline: deadline,
+            description: description.trim().substring(0, 500),
+            priority: determinePriority(new Date(deadline)),
+          });
+          updated++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
+      // Check title duplicate (non-moodle tasks)
+      if (existingTitles.has(title.toLowerCase())) {
         skipped++;
         continue;
       }
+
+      // Skip past events only for NEW imports (not updates)
+      const deadlineDate = new Date(deadline);
+      if (deadlineDate < new Date()) {
+        skipped++;
+        continue;
+      }
+
+      // CREATE new task
+      const task = {
+        id: generateId(),
+        title: title,
+        description: description.trim().substring(0, 500),
+        deadline: deadline,
+        estimatedMinutes: 60,
+        category: 'study',
+        priority: determinePriority(deadlineDate),
+        completed: false,
+        completedAt: null,
+        subtasks: [],
+        createdAt: new Date().toISOString(),
+        moodleId: moodleId,
+        moodleSource: true,
+        moodleUrl: event.url || null,
+      };
 
       store.addTask(task);
-      existingMoodleIds.add(moodleIdStr);
-      existingTitles.add(task.title.toLowerCase());
+      existingMoodleMap.set(moodleId, task);
+      existingTitles.add(title.toLowerCase());
       imported++;
     }
 
-    if (imported > 0) {
-      showToast(`✅ Đã import ${imported} task từ Moodle! (${skipped} bỏ qua)`, 'success');
-      notifyNewMoodleTasks(imported);
+    // Check for tasks deleted on Moodle (mark as completed or add note)
+    let removed = 0;
+    for (const [mId, task] of existingMoodleMap) {
+      if (!serverMoodleIds.has(mId) && !task.completed) {
+        // Task was on Moodle but no longer — mark with note
+        store.updateTask(task.id, {
+          description: task.description + '\n\n⚠️ This task was removed/completed on Moodle.',
+        });
+        removed++;
+      }
+    }
+
+    // Build summary message
+    const parts = [];
+    if (imported > 0) parts.push(`${imported} mới`);
+    if (updated > 0) parts.push(`${updated} cập nhật`);
+    if (removed > 0) parts.push(`${removed} đã xóa trên Moodle`);
+
+    if (parts.length > 0) {
+      showToast(`✅ Sync xong: ${parts.join(', ')} (${skipped} bỏ qua)`, 'success');
+      if (imported > 0) notifyNewMoodleTasks(imported);
     } else if (allEvents.length > 0) {
-      showToast(`ℹ️ Không có task mới (${skipped} đã tồn tại)`, 'info');
+      showToast(`ℹ️ Không có thay đổi (${skipped} task giữ nguyên)`, 'info');
     } else {
       showToast('ℹ️ Không tìm thấy deadline nào trên Moodle', 'info');
     }
