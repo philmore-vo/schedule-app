@@ -116,8 +116,11 @@ echo [4/4] Creating quick launch file...
     echo @echo off
     echo title TaskFlow AI
     echo cd /d "%%~dp0"
-    echo start "" /MIN cmd /c "npm start"
-    echo exit
+    echo if not exist "node_modules" (
+    echo     echo Installing dependencies...
+    echo     call npm install --no-audit --no-fund
+    echo )
+    echo call npm start
 ) > "%~dp0start-app.bat"
 
 echo  [OK] "start-app.bat" created!
@@ -136,8 +139,10 @@ set /p RUN_NOW="  Run app now? (Y/N): "
 if /i "%RUN_NOW%"=="Y" (
     echo.
     echo  Starting TaskFlow AI...
-    start "" /MIN cmd /c "cd /d "%~dp0" && npm start"
+    cd /d "%~dp0"
+    call npm start
 )
 
 echo.
-pause
+echo  Press any key to close this window...
+pause >nul
