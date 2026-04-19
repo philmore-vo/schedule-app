@@ -78,8 +78,10 @@ export async function sendMessage(text = null) {
     // Parse and execute actions
     const { text, actions } = parseAIResponse(fullText);
 
-    // Update bubble with clean text (without actions JSON)
-    updateAssistantBubble(assistantDiv, text);
+    // Fallback text so an actions-only response doesn't render an empty bubble
+    // (which visually "floats up" next to the previous question).
+    const displayText = text || (actions.length > 0 ? '✅ Done.' : '');
+    updateAssistantBubble(assistantDiv, displayText);
 
     // Execute actions if any
     if (actions.length > 0) {
@@ -93,7 +95,7 @@ export async function sendMessage(text = null) {
     }
 
     // Save assistant message (text only, not actions JSON)
-    store.addChatMessage({ role: 'assistant', content: text });
+    store.addChatMessage({ role: 'assistant', content: displayText });
   } catch (error) {
     removeTypingIndicator();
     appendMessage('assistant', `⚠️ ${error.message}`);
@@ -339,12 +341,58 @@ function executeActions(actions) {
             results.push({ type: 'error', message: 'Missing task ID for update' });
             break;
           }
-          const updated = updateTask(action.id, action.updates || {});
+          const updates = { ...(action.updates || {}) };
+          // Normalize subtasks: strings → proper objects so the UI can render them
+          if (Array.isArray(updates.subtasks)) {
+            updates.subtasks = updates.subtasks
+              .map(s => {
+                if (typeof s === 'string') {
+                  return { id: generateId(), title: s.trim(), completed: false };
+                }
+                if (s && typeof s === 'object') {
+                  return {
+                    id: s.id || generateId(),
+                    title: (s.title || '').trim(),
+                    completed: !!s.completed,
+                  };
+                }
+                return null;
+              })
+              .filter(s => s && s.title);
+          }
+          const updated = updateTask(action.id, updates);
           if (updated) {
             results.push({ type: 'updated', title: updated.title, success: true });
           } else {
             results.push({ type: 'error', message: `Task not found: ${action.id}` });
           }
+          break;
+        }
+
+        case 'add_subtasks': {
+          if (!action.id) {
+            results.push({ type: 'error', message: 'Missing task ID for add_subtasks' });
+            break;
+          }
+          const task = store.getTask(action.id);
+          if (!task) {
+            results.push({ type: 'error', message: `Task not found: ${action.id}` });
+            break;
+          }
+          const incoming = Array.isArray(action.subtasks) ? action.subtasks : [];
+          const newSubs = incoming
+            .map(s => {
+              const title = typeof s === 'string' ? s : (s && s.title) || '';
+              return title.trim() ? { id: generateId(), title: title.trim(), completed: false } : null;
+            })
+            .filter(Boolean);
+          if (newSubs.length === 0) {
+            results.push({ type: 'error', message: 'No valid subtasks provided' });
+            break;
+          }
+          const merged = [...(task.subtasks || []), ...newSubs];
+          updateTask(action.id, { subtasks: merged });
+          results.push({ type: 'updated', title: `${task.title} (+${newSubs.length} subtasks)`, success: true });
           break;
         }
 

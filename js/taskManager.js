@@ -214,6 +214,10 @@ export function getTasksForAIContext() {
       hour: 'numeric', minute: '2-digit', hour12: true,
     });
 
+    const subtasks = (t.subtasks || [])
+      .filter(s => s && typeof s === 'object' && s.title)
+      .map(s => ({ title: s.title, completed: !!s.completed }));
+
     return {
       id: t.id,
       title: t.title,
@@ -222,8 +226,9 @@ export function getTasksForAIContext() {
       estimatedMinutes: t.estimatedMinutes,
       category: t.category,
       priority: t.priority,
-      subtaskCount: (t.subtasks || []).length,
-      subtasksCompleted: (t.subtasks || []).filter(s => s.completed).length,
+      subtasks,
+      subtaskCount: subtasks.length,
+      subtasksCompleted: subtasks.filter(s => s.completed).length,
       createdAt: createdLocal,
     };
   });
