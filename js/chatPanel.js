@@ -1,14 +1,16 @@
 /* ============================================
-   TaskFlow AI — Chat Panel
+   TaskFlow AI — Chat Panel (Agent Loop)
    ============================================ */
 
 import { store } from './store.js';
-import { chatWithAI } from './aiService.js';
+import { runAgentTurn, buildInitialAgentMessages } from './aiService.js';
 import { markdownToHtml, generateId } from './utils.js';
 import { createTask, updateTask, deleteTask, toggleTask } from './taskManager.js';
-import { showToast, renderAll } from './uiRenderer.js';
+import { renderAll } from './uiRenderer.js';
 
 let isStreaming = false;
+
+const MAX_AGENT_TURNS = 8;
 
 /**
  * Initialize chat panel
@@ -18,9 +20,6 @@ export function initChatPanel() {
   setupChatInput();
 }
 
-/**
- * Setup chat input event listeners
- */
 function setupChatInput() {
   const input = document.getElementById('chatInput');
   if (!input) return;
@@ -32,7 +31,6 @@ function setupChatInput() {
     }
   });
 
-  // Auto-resize
   input.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
@@ -40,7 +38,7 @@ function setupChatInput() {
 }
 
 /**
- * Send a chat message
+ * Send a chat message — runs the full agent loop until the model stops calling tools.
  */
 export async function sendMessage(text = null) {
   if (isStreaming) return;
@@ -54,48 +52,79 @@ export async function sendMessage(text = null) {
     input.style.height = 'auto';
   }
 
-  // Add user message
+  // Persist user message + render
   store.addChatMessage({ role: 'user', content: message });
   appendMessage('user', message);
 
-  // Show typing indicator
   showTypingIndicator();
   isStreaming = true;
   updateSendButton();
 
   try {
-    // Create assistant message container
-    const assistantDiv = createAssistantBubble();
-    let fullText = '';
+    // Build messages array for the API: system + last N of stored history (which now includes this user msg)
+    const history = store.getChatHistory().slice(-20);
+    const messages = buildInitialAgentMessages(history);
 
-    await chatWithAI(message, (chunk) => {
-      fullText += chunk;
-      // Show text without actions block during streaming
-      const displayText = fullText.split('---ACTIONS---')[0].trim();
-      updateAssistantBubble(assistantDiv, displayText);
-    });
+    // Agent loop: call model → execute tools → call again → repeat until no tool calls
+    for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
+      removeTypingIndicator();
+      const assistantDiv = createAssistantBubble();
+      let streamedText = '';
 
-    // Parse and execute actions
-    const { text, actions } = parseAIResponse(fullText);
+      const { text: turnText, toolCalls } = await runAgentTurn(messages, (chunk) => {
+        streamedText += chunk;
+        updateAssistantBubble(assistantDiv, streamedText);
+      });
 
-    // Fallback text so an actions-only response doesn't render an empty bubble
-    // (which visually "floats up" next to the previous question).
-    const displayText = text || (actions.length > 0 ? '✅ Done.' : '');
-    updateAssistantBubble(assistantDiv, displayText);
-
-    // Execute actions if any
-    if (actions.length > 0) {
-      const results = executeActions(actions);
-      // Show action results in chat
-      if (results.length > 0) {
-        appendActionResults(results);
+      // Finalize the bubble for this turn
+      if (turnText && turnText.trim()) {
+        updateAssistantBubble(assistantDiv, turnText);
+        store.addChatMessage({ role: 'assistant', content: turnText });
+      } else if (toolCalls.length === 0) {
+        // No text and no tools — weird but show something
+        updateAssistantBubble(assistantDiv, '(no response)');
+      } else {
+        // Empty text but tools pending — drop the empty bubble; action badges will follow
+        assistantDiv.remove();
       }
-      // Refresh task list
-      renderAll();
-    }
 
-    // Save assistant message (text only, not actions JSON)
-    store.addChatMessage({ role: 'assistant', content: displayText });
+      if (toolCalls.length === 0) break;
+
+      // Record the assistant message with tool_calls so the model sees its own call on the next turn
+      messages.push({
+        role: 'assistant',
+        content: turnText || '',
+        tool_calls: toolCalls.map(tc => ({
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.name, arguments: tc.arguments || '{}' },
+        })),
+      });
+
+      // Execute each tool call and push a tool-result message per call
+      showTypingIndicator();
+      const displayResults = [];
+      for (const tc of toolCalls) {
+        let args = {};
+        try {
+          args = tc.arguments ? JSON.parse(tc.arguments) : {};
+        } catch (e) {
+          console.warn('Invalid tool arguments JSON:', tc.arguments, e);
+        }
+        const { display, toolResult } = executeTool(tc.name, args);
+        displayResults.push(display);
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(toolResult),
+        });
+      }
+
+      if (displayResults.length > 0) {
+        appendActionResults(displayResults);
+        renderAll();
+      }
+    }
   } catch (error) {
     removeTypingIndicator();
     appendMessage('assistant', `⚠️ ${error.message}`);
@@ -107,9 +136,171 @@ export async function sendMessage(text = null) {
   }
 }
 
+/* ══════════════════════════════════════════════
+   TOOL EXECUTION
+   ══════════════════════════════════════════════ */
+
 /**
- * Render all chat messages from history
+ * Execute a single tool call.
+ * Returns { display, toolResult }:
+ *   - display: object for the in-chat action badge
+ *   - toolResult: object sent back to the model as the tool response
  */
+function executeTool(name, args) {
+  try {
+    switch (name) {
+      case 'create_task': {
+        const task = createTask({
+          title: args.title || 'Untitled Task',
+          description: args.description || '',
+          deadline: args.deadline || '',
+          estimatedMinutes: args.estimatedMinutes || 60,
+          category: args.category || 'other',
+          priority: args.priority || 'medium',
+          subtasks: Array.isArray(args.subtasks) ? args.subtasks : [],
+        });
+        return {
+          display: { type: 'created', title: task.title },
+          toolResult: { ok: true, id: task.id, title: task.title },
+        };
+      }
+
+      case 'update_task': {
+        if (!args.id) {
+          return { display: { type: 'error', message: 'Missing task id' }, toolResult: { ok: false, error: 'Missing id' } };
+        }
+        const { id, ...updates } = args;
+        if (Array.isArray(updates.subtasks)) {
+          updates.subtasks = normalizeSubtasks(updates.subtasks);
+        }
+        const updated = updateTask(id, updates);
+        if (!updated) {
+          return { display: { type: 'error', message: `Task not found: ${id}` }, toolResult: { ok: false, error: 'Task not found' } };
+        }
+        return {
+          display: { type: 'updated', title: updated.title },
+          toolResult: { ok: true, id: updated.id, title: updated.title },
+        };
+      }
+
+      case 'add_subtasks': {
+        if (!args.id) {
+          return { display: { type: 'error', message: 'Missing task id' }, toolResult: { ok: false, error: 'Missing id' } };
+        }
+        const task = store.getTask(args.id);
+        if (!task) {
+          return { display: { type: 'error', message: `Task not found: ${args.id}` }, toolResult: { ok: false, error: 'Task not found' } };
+        }
+        const incoming = Array.isArray(args.subtasks) ? args.subtasks : [];
+        const newSubs = normalizeSubtasks(incoming);
+        if (newSubs.length === 0) {
+          return { display: { type: 'error', message: 'No valid subtasks provided' }, toolResult: { ok: false, error: 'No valid subtasks' } };
+        }
+        const merged = [...(task.subtasks || []), ...newSubs];
+        updateTask(args.id, { subtasks: merged });
+        return {
+          display: { type: 'updated', title: `${task.title} (+${newSubs.length} subtasks)` },
+          toolResult: { ok: true, id: task.id, added: newSubs.length, total: merged.length },
+        };
+      }
+
+      case 'delete_task': {
+        if (!args.id) {
+          return { display: { type: 'error', message: 'Missing task id' }, toolResult: { ok: false, error: 'Missing id' } };
+        }
+        const task = store.getTask(args.id);
+        if (!task) {
+          return { display: { type: 'error', message: `Task not found: ${args.id}` }, toolResult: { ok: false, error: 'Task not found' } };
+        }
+        deleteTask(args.id);
+        return {
+          display: { type: 'deleted', title: task.title },
+          toolResult: { ok: true, id: args.id },
+        };
+      }
+
+      case 'complete_task': {
+        if (!args.id) {
+          return { display: { type: 'error', message: 'Missing task id' }, toolResult: { ok: false, error: 'Missing id' } };
+        }
+        const task = store.getTask(args.id);
+        if (!task) {
+          return { display: { type: 'error', message: `Task not found: ${args.id}` }, toolResult: { ok: false, error: 'Task not found' } };
+        }
+        if (!task.completed) toggleTask(args.id);
+        return {
+          display: { type: 'completed', title: task.title },
+          toolResult: { ok: true, id: task.id, title: task.title },
+        };
+      }
+
+      case 'get_task': {
+        if (!args.id) {
+          return { display: { type: 'error', message: 'Missing task id' }, toolResult: { ok: false, error: 'Missing id' } };
+        }
+        const task = store.getTask(args.id);
+        if (!task) {
+          return { display: { type: 'error', message: `Task not found: ${args.id}` }, toolResult: { ok: false, error: 'Task not found' } };
+        }
+        return {
+          display: { type: 'fetched', title: task.title },
+          toolResult: {
+            ok: true,
+            task: {
+              id: task.id,
+              title: task.title,
+              description: task.description || '',
+              deadline: task.deadline,
+              estimatedMinutes: task.estimatedMinutes,
+              category: task.category,
+              priority: task.priority,
+              completed: task.completed,
+              subtasks: (task.subtasks || []).map(s => ({
+                title: s && s.title ? s.title : String(s),
+                completed: !!(s && s.completed),
+              })),
+            },
+          },
+        };
+      }
+
+      default:
+        return {
+          display: { type: 'error', message: `Unknown tool: ${name}` },
+          toolResult: { ok: false, error: `Unknown tool: ${name}` },
+        };
+    }
+  } catch (e) {
+    console.error('Tool execution error:', name, e);
+    return {
+      display: { type: 'error', message: e.message },
+      toolResult: { ok: false, error: e.message },
+    };
+  }
+}
+
+function normalizeSubtasks(list) {
+  return list
+    .map(s => {
+      if (typeof s === 'string') {
+        return { id: generateId(), title: s.trim(), completed: false };
+      }
+      if (s && typeof s === 'object') {
+        return {
+          id: s.id || generateId(),
+          title: (s.title || '').trim(),
+          completed: !!s.completed,
+        };
+      }
+      return null;
+    })
+    .filter(s => s && s.title);
+}
+
+/* ══════════════════════════════════════════════
+   CHAT RENDERING
+   ══════════════════════════════════════════════ */
+
 export function renderChatMessages() {
   const container = document.getElementById('chatMessages');
   if (!container) return;
@@ -143,14 +334,10 @@ export function renderChatMessages() {
   scrollToBottom();
 }
 
-/**
- * Append a message to the chat
- */
 function appendMessage(role, content, scroll = true) {
   const container = document.getElementById('chatMessages');
   if (!container) return;
 
-  // Remove welcome message if present
   const welcome = container.querySelector('.chat-welcome');
   if (welcome) welcome.remove();
   const quick = container.querySelector('.quick-actions');
@@ -171,21 +358,23 @@ function appendMessage(role, content, scroll = true) {
   if (scroll) scrollToBottom();
 }
 
-/**
- * Create an empty assistant bubble for streaming
- */
 function createAssistantBubble() {
   const container = document.getElementById('chatMessages');
   if (!container) return null;
 
   removeTypingIndicator();
 
+  // Drop any leftover welcome/quick-action blocks so the bubble isn't orphaned above them
+  const welcome = container.querySelector('.chat-welcome');
+  if (welcome) welcome.remove();
+  const quick = container.querySelector('.quick-actions');
+  if (quick) quick.remove();
+
   const div = document.createElement('div');
   div.className = 'chat-message assistant';
-  div.id = 'streamingMessage';
   div.innerHTML = `
     <div class="chat-avatar">🤖</div>
-    <div class="chat-bubble" id="streamingBubble"></div>
+    <div class="chat-bubble"></div>
   `;
 
   container.appendChild(div);
@@ -193,20 +382,15 @@ function createAssistantBubble() {
   return div;
 }
 
-/**
- * Update the streaming assistant bubble
- */
 function updateAssistantBubble(div, text) {
-  const bubble = document.getElementById('streamingBubble');
+  if (!div) return;
+  const bubble = div.querySelector('.chat-bubble');
   if (bubble) {
     bubble.innerHTML = markdownToHtml(text);
     scrollToBottom();
   }
 }
 
-/**
- * Show typing indicator
- */
 function showTypingIndicator() {
   const container = document.getElementById('chatMessages');
   if (!container) return;
@@ -227,17 +411,11 @@ function showTypingIndicator() {
   scrollToBottom();
 }
 
-/**
- * Remove typing indicator
- */
 function removeTypingIndicator() {
   const el = document.getElementById('typingIndicator');
   if (el) el.remove();
 }
 
-/**
- * Scroll chat to bottom
- */
 function scrollToBottom() {
   const container = document.getElementById('chatMessages');
   if (container) {
@@ -245,9 +423,6 @@ function scrollToBottom() {
   }
 }
 
-/**
- * Update send button state
- */
 function updateSendButton() {
   const btn = document.getElementById('chatSendBtn');
   if (btn) {
@@ -256,9 +431,6 @@ function updateSendButton() {
   }
 }
 
-/**
- * Clear chat history
- */
 export function clearChat() {
   store.clearChatHistory();
   renderChatMessages();
@@ -270,176 +442,8 @@ function escHtml(str) {
   return d.innerHTML;
 }
 
-/* ══════════════════════════════════════════════
-   AI AGENT: Parse & Execute Actions
-   ══════════════════════════════════════════════ */
-
 /**
- * Parse AI response to separate text from action commands
- */
-function parseAIResponse(fullText) {
-  const marker = '---ACTIONS---';
-  const markerIdx = fullText.indexOf(marker);
-
-  if (markerIdx === -1) {
-    return { text: fullText.trim(), actions: [] };
-  }
-
-  const text = fullText.substring(0, markerIdx).trim();
-  const actionsStr = fullText.substring(markerIdx + marker.length).trim();
-
-  try {
-    // Extract JSON array from the actions string
-    let jsonStr = actionsStr;
-
-    // Remove markdown code fences if present
-    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) {
-      jsonStr = fenceMatch[1].trim();
-    }
-
-    // Find array
-    const arrStart = jsonStr.indexOf('[');
-    const arrEnd = jsonStr.lastIndexOf(']');
-    if (arrStart !== -1 && arrEnd !== -1) {
-      jsonStr = jsonStr.substring(arrStart, arrEnd + 1);
-    }
-
-    const actions = JSON.parse(jsonStr);
-    return { text, actions: Array.isArray(actions) ? actions : [actions] };
-  } catch (e) {
-    console.warn('Failed to parse AI actions:', actionsStr, e);
-    return { text, actions: [] };
-  }
-}
-
-/**
- * Execute AI agent actions
- */
-function executeActions(actions) {
-  const results = [];
-
-  for (const action of actions) {
-    try {
-      switch (action.action) {
-        case 'create_task': {
-          const task = createTask({
-            title: action.title || 'Untitled Task',
-            description: action.description || '',
-            deadline: action.deadline || '',
-            estimatedMinutes: action.estimatedMinutes || 60,
-            category: action.category || 'other',
-            priority: action.priority || 'medium',
-            subtasks: action.subtasks || [],
-          });
-          results.push({ type: 'created', title: action.title, success: true });
-          break;
-        }
-
-        case 'update_task': {
-          if (!action.id) {
-            results.push({ type: 'error', message: 'Missing task ID for update' });
-            break;
-          }
-          const updates = { ...(action.updates || {}) };
-          // Normalize subtasks: strings → proper objects so the UI can render them
-          if (Array.isArray(updates.subtasks)) {
-            updates.subtasks = updates.subtasks
-              .map(s => {
-                if (typeof s === 'string') {
-                  return { id: generateId(), title: s.trim(), completed: false };
-                }
-                if (s && typeof s === 'object') {
-                  return {
-                    id: s.id || generateId(),
-                    title: (s.title || '').trim(),
-                    completed: !!s.completed,
-                  };
-                }
-                return null;
-              })
-              .filter(s => s && s.title);
-          }
-          const updated = updateTask(action.id, updates);
-          if (updated) {
-            results.push({ type: 'updated', title: updated.title, success: true });
-          } else {
-            results.push({ type: 'error', message: `Task not found: ${action.id}` });
-          }
-          break;
-        }
-
-        case 'add_subtasks': {
-          if (!action.id) {
-            results.push({ type: 'error', message: 'Missing task ID for add_subtasks' });
-            break;
-          }
-          const task = store.getTask(action.id);
-          if (!task) {
-            results.push({ type: 'error', message: `Task not found: ${action.id}` });
-            break;
-          }
-          const incoming = Array.isArray(action.subtasks) ? action.subtasks : [];
-          const newSubs = incoming
-            .map(s => {
-              const title = typeof s === 'string' ? s : (s && s.title) || '';
-              return title.trim() ? { id: generateId(), title: title.trim(), completed: false } : null;
-            })
-            .filter(Boolean);
-          if (newSubs.length === 0) {
-            results.push({ type: 'error', message: 'No valid subtasks provided' });
-            break;
-          }
-          const merged = [...(task.subtasks || []), ...newSubs];
-          updateTask(action.id, { subtasks: merged });
-          results.push({ type: 'updated', title: `${task.title} (+${newSubs.length} subtasks)`, success: true });
-          break;
-        }
-
-        case 'delete_task': {
-          if (!action.id) {
-            results.push({ type: 'error', message: 'Missing task ID for delete' });
-            break;
-          }
-          const task = store.getTask(action.id);
-          if (task) {
-            deleteTask(action.id);
-            results.push({ type: 'deleted', title: task.title, success: true });
-          } else {
-            results.push({ type: 'error', message: `Task not found: ${action.id}` });
-          }
-          break;
-        }
-
-        case 'complete_task': {
-          if (!action.id) {
-            results.push({ type: 'error', message: 'Missing task ID for complete' });
-            break;
-          }
-          const task = store.getTask(action.id);
-          if (task) {
-            if (!task.completed) toggleTask(action.id);
-            results.push({ type: 'completed', title: task.title, success: true });
-          } else {
-            results.push({ type: 'error', message: `Task not found: ${action.id}` });
-          }
-          break;
-        }
-
-        default:
-          results.push({ type: 'error', message: `Unknown action: ${action.action}` });
-      }
-    } catch (e) {
-      console.error('Action execution error:', e);
-      results.push({ type: 'error', message: e.message });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Show action results as visual badges in chat
+ * Show action badges in chat for executed tool calls.
  */
 function appendActionResults(results) {
   const container = document.getElementById('chatMessages');
@@ -453,6 +457,7 @@ function appendActionResults(results) {
     updated: '✏️ Updated',
     deleted: '🗑️ Deleted',
     completed: '☑️ Completed',
+    fetched: '🔍 Fetched',
     error: '⚠️ Error',
   };
 
@@ -467,4 +472,3 @@ function appendActionResults(results) {
   container.appendChild(div);
   scrollToBottom();
 }
-
