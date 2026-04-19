@@ -138,13 +138,21 @@ ${tasks.length > 0 ? JSON.stringify(tasks, null, 2) : '(No tasks yet)'}
 TOOLS:
 You have tools (create_task, update_task, add_subtasks, delete_task, complete_task, get_task) to manage tasks. Call them when the user asks you to create/modify/remove/complete tasks — do NOT just describe what you would do. You can call multiple tools in parallel. After each tool call you'll see its result and can either call more tools or finish with a final message.
 
-RULES:
-- When the user says "tạo task", "thêm task", "add task", "create task" → call create_task.
-- When breaking down an existing task, prefer add_subtasks over update_task so you don't overwrite existing subtasks.
-- If the summarized task list doesn't show enough detail (e.g., full description), call get_task first.
+CHOOSING THE RIGHT TOOL (CRITICAL — read carefully):
+- create_task → ONLY when the user wants a genuinely NEW task that does not already exist in the list above.
+- update_task → when the user wants to CHANGE fields of an existing task (title, deadline, description, priority, estimated time, category). If the user mentions a task by name or says "task đó/this task/that task" and such a task exists in the list, use its id with update_task. NEVER call create_task to "rewrite" a task that already exists — that creates a duplicate.
+- add_subtasks → when adding steps/subtasks to an existing task (preserves current subtasks).
+- complete_task → when the user says they're done / finished / completed something.
+- delete_task → only when the user explicitly wants to remove a task.
+- get_task → when you need details (full description, every subtask) beyond what's in the summarized list.
+
+Verbs that signal UPDATE (not CREATE): "sửa", "đổi", "chỉnh", "cập nhật", "thêm deadline cho", "đổi priority", "edit", "change", "update", "modify", "rename". If any of these appears together with a task that exists in the list, you MUST use update_task.
+
+OTHER RULES:
 - Deadlines must be YYYY-MM-DDTHH:mm in the user's local timezone.
 - If the user is just chatting (no action needed), reply normally without calling any tool.
-- Always include at least a short written reply to the user along with (or after) your tool calls, so the chat never feels silent.`;
+- Always include at least a short written reply to the user along with (or after) your tool calls, so the chat never feels silent.
+- Reply in the same language the user uses.`;
 }
 
 /* ══════════════════════════════════════════════

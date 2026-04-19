@@ -150,8 +150,32 @@ function executeTool(name, args) {
   try {
     switch (name) {
       case 'create_task': {
+        const newTitle = (args.title || '').trim();
+        if (!newTitle) {
+          return {
+            display: { type: 'error', message: 'Missing title' },
+            toolResult: { ok: false, error: 'Title is required' },
+          };
+        }
+        // Dedup guard: if an active task with the same title already exists,
+        // refuse to create a duplicate and tell the model to use update_task instead.
+        const existing = store.getTasks().find(t =>
+          !t.completed && t.title.trim().toLowerCase() === newTitle.toLowerCase()
+        );
+        if (existing) {
+          return {
+            display: { type: 'error', message: `Already exists: ${existing.title}` },
+            toolResult: {
+              ok: false,
+              error: 'DUPLICATE_TITLE',
+              message: `A task named "${existing.title}" already exists (id: ${existing.id}). If the user wants to modify it, call update_task with that id instead of create_task.`,
+              existingId: existing.id,
+              existingTitle: existing.title,
+            },
+          };
+        }
         const task = createTask({
-          title: args.title || 'Untitled Task',
+          title: newTitle,
           description: args.description || '',
           deadline: args.deadline || '',
           estimatedMinutes: args.estimatedMinutes || 60,
