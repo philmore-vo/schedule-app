@@ -60,6 +60,8 @@ Return ONLY a valid JSON array (no markdown, no code fences), with objects in th
   }
 ]
 
+CRITICAL: You MUST return ALL ${tasks.length} tasks. Do NOT skip any task. Every task ID from the input must appear in your output.
+
 Order by aiPriority (1 = do first).`;
 
   const userPrompt = `Here are my current tasks:\n\n${JSON.stringify(tasks, null, 2)}\n\nPlease create an optimal schedule for me. Think carefully about each task — reason like a real productivity expert, not a sorting algorithm.`;
@@ -88,6 +90,33 @@ Order by aiPriority (1 = do first).`;
 
     if (!Array.isArray(schedule)) {
       throw new Error('AI response is not an array');
+    }
+
+    // Validate: check if AI returned all tasks
+    const returnedIds = new Set(schedule.map(s => s.id));
+    const missingTasks = tasks.filter(t => !returnedIds.has(t.id));
+
+    if (missingTasks.length > 0) {
+      console.warn(`AI missed ${missingTasks.length} tasks:`, missingTasks.map(t => t.title));
+      // Add missing tasks at the end with auto-generated schedule
+      let lastPriority = schedule.length;
+      let lastEndTime = schedule.length > 0
+        ? new Date(schedule[schedule.length - 1].aiEndTime)
+        : new Date();
+
+      for (const task of missingTasks) {
+        lastPriority++;
+        const startTime = new Date(lastEndTime.getTime() + 15 * 60000);
+        const endTime = new Date(startTime.getTime() + (task.estimatedMinutes || 60) * 60000);
+        schedule.push({
+          id: task.id,
+          aiPriority: lastPriority,
+          aiStartTime: startTime.toISOString(),
+          aiEndTime: endTime.toISOString(),
+          aiReason: '(AI missed this task — auto-appended)',
+        });
+        lastEndTime = endTime;
+      }
     }
 
     return schedule;
@@ -174,7 +203,7 @@ async function callAI(systemPrompt, userMessage, settings, json = false) {
     model: settings.model,
     messages,
     temperature: 0.3,
-    max_tokens: 4000,
+    max_tokens: 8000,
   };
 
   if (json) {
