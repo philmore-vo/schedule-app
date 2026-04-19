@@ -52,8 +52,14 @@ echo [3/4] Create Desktop shortcut? (Y/N)
 set /p SHORTCUT="  > "
 if /i "%SHORTCUT%"=="Y" (
     echo  Creating shortcut...
-    powershell -Command " = New-Object -ComObject WScript.Shell;  = .CreateShortcut([Environment]::GetFolderPath('Desktop') + '\TaskFlow AI.lnk'); .TargetPath = '%~dp0start-app.bat'; .WorkingDirectory = '%~dp0'; .WindowStyle = 7; .Save()"
-    echo  Shortcut created on Desktop!
+    set "APPDIR=%~dp0"
+    set "APPDIR=!APPDIR:~0,-1!"
+    powershell -ExecutionPolicy Bypass -Command " = New-Object -ComObject WScript.Shell;  = .CreateShortcut(\"C:\Users\votro_ndnyus1\Desktop\TaskFlow AI.lnk\"); .TargetPath = \"!APPDIR!\start-app.bat\"; .WorkingDirectory = \"!APPDIR!\"; .WindowStyle = 7; .Save()"
+    if exist "%USERPROFILE%\Desktop\TaskFlow AI.lnk" (
+        echo  Shortcut created on Desktop!
+    ) else (
+        echo  Could not create shortcut automatically.
+    )
 )
 
 echo.
